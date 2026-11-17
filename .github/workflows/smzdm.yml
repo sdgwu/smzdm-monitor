@@ -1,15 +1,15 @@
 name: SMZDM 好价监控 NEW
 
 on:
-  # 由 cron-job.org 每 15 分钟触发。不要再叠加 GitHub schedule，避免重复扫描。
-  workflow_dispatch:
+  # GitHub 自带定时，每 30 分钟跑一次；不再用 cron-job.org，避免重复扫描。
+  schedule:
+      - cron: '*/30 * * * *'
+      workflow_dispatch:
     inputs:
       debug_article_id:
         description: '可选：查询指定文章 ID 的候选快照和推送历史'
         required: false
         type: string
-  repository_dispatch:
-    types: [cron_trigger]
 
 permissions:
   contents: write
