@@ -1103,7 +1103,7 @@ class SmzdmScraper:
                 )
             return
 
-                if self._is_title_blocked(parsed):
+        if self._is_title_blocked(parsed):
             self.stats['total_filtered_title_pattern'] += 1
             if parsed.get('rank_source'):
                 self.stats['total_rank_filtered_title'] += 1
@@ -2003,7 +2003,7 @@ class SmzdmScraper:
             f"前快照:{trend.get('previous_captured_at') or '-'}"
         )
 
-        def _matches_user_keywords(self, parsed):
+    def _matches_user_keywords(self, parsed):
         """标题或商城名包含任一用户关键词即通过（大小写不敏感）；无关键词配置时全部通过。"""
         if not self.user_keywords:
             return True
