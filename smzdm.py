@@ -85,6 +85,20 @@ def _running_under_unittest():
     return base.startswith("test_") and base.endswith(".py")
 
 
+def _load_user_keywords():
+    """从仓库根目录的 keywords.txt 读取用户关键词（每行一个，# 开头为注释）。
+    文件不存在、为空或在单元测试下运行时返回空列表，表示不过滤。"""
+    if _running_under_unittest():
+        return []
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "keywords.txt")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            keywords = [line.strip() for line in f]
+        return [kw for kw in keywords if kw and not kw.startswith("#")]
+    except OSError:
+        return []
+
+
 def _safe_mode_from_env():
     """Workflow sets this only when neither cache nor the state branch had a database."""
     return os.environ.get("SMZDM_STATE_RESTORED", "").strip().lower() in {"0", "false", "no"}
@@ -435,6 +449,9 @@ class SmzdmScraper:
         self.fingerprint_min_prices = {}
         self.product_key_min_prices = {}
         self._load_existing_ids()
+        self.user_keywords = _load_user_keywords()
+        if self.user_keywords:
+            logging.info(f"已加载 {len(self.user_keywords)} 个用户关键词，标题不含关键词的商品将跳过")
 
         self.stats = {
             'total_fetched': 0,
@@ -469,6 +486,7 @@ class SmzdmScraper:
             'total_filtered_trend_slow': 0,
             'total_deferred_trend_confirmation': 0,
             'total_filtered_title_pattern': 0,
+            'total_filtered_user_keywords': 0,
             'total_filtered_stage1': 0,
             'total_page_request_failures': 0,
             'total_main_scan_aborted': 0,
@@ -1085,10 +1103,13 @@ class SmzdmScraper:
                 )
             return
 
-        if self._is_title_blocked(parsed):
+                if self._is_title_blocked(parsed):
             self.stats['total_filtered_title_pattern'] += 1
             if parsed.get('rank_source'):
                 self.stats['total_rank_filtered_title'] += 1
+            return
+        if self.user_keywords and not self._matches_user_keywords(parsed):
+            self.stats['total_filtered_user_keywords'] += 1
             return
 
         self._attach_trend_metrics(parsed)
@@ -1981,6 +2002,13 @@ class SmzdmScraper:
             f"首快照:{trend.get('first_captured_at') or '-'} "
             f"前快照:{trend.get('previous_captured_at') or '-'}"
         )
+
+        def _matches_user_keywords(self, parsed):
+        """标题或商城名包含任一用户关键词即通过（大小写不敏感）；无关键词配置时全部通过。"""
+        if not self.user_keywords:
+            return True
+        text = f"{parsed.get('mall', '')} {parsed.get('title', '')}".casefold()
+        return any(kw.casefold() in text for kw in self.user_keywords)
 
     def _is_title_blocked(self, parsed):
         text = self._normalize_task_title(
